@@ -1,80 +1,42 @@
-# wallet-core
+# Wallet Core
 
-This project uses Quarkus, the Supersonic Subatomic Java Framework.
+Um sistema de carteira digital e painel administrativo desenvolvido para demonstrar padrões arquiteturais avançados aplicados a transações financeiras. O projeto foca em alta concorrência, resiliência e processamento assíncrono.
 
-If you want to learn more about Quarkus, please visit its website: <https://quarkus.io/>.
+## 🚀 Arquitetura e Tecnologias
 
-## Running the application in dev mode
+O projeto adota uma estrutura em **Monorepo**, dividindo as responsabilidades entre uma API de alta performance e uma interface reativa.
 
-You can run your application in dev mode that enables live coding using:
+### Back-end (Java 21 LTS & Quarkus 3)
+* **Garantia de Idempotência (Redis):** Interceção de transações duplicadas (ex: cliques múltiplos na interface) em milissegundos utilizando chaves únicas de transação, protegendo a integridade do saldo.
+* **Processamento Assíncrono (RabbitMQ):** Desacoplamento da consolidação financeira. A API REST regista a intenção, e os *Workers* em background executam o cálculo transacional e atualizam o banco de dados, permitindo altíssima escalabilidade.
+* **Persistência (PostgreSQL & Hibernate Panache):** Armazenamento relacional seguro para entidades de `Account` e `Transaction`.
+* **Design Patterns:** Separação clara de domínio e infraestrutura, facilitando testes e manutenção.
 
-```shell script
-./mvnw quarkus:dev
+### Front-end (React & TypeScript)
+* **Core:** React com tipagem estrita para segurança de dados no cliente.
+* **Build & Roteamento:** Vite com configuração de Proxy reverso em ambiente de desenvolvimento, eliminando problemas de CORS nativamente.
+* **Estilização:** Tailwind CSS para um design responsivo, limpo e condicional (indicadores de débito/crédito).
+
+## ⚙️ Como Executar o Projeto
+
+Certifique-se de ter o **Docker Desktop**, **Java 21**, **Maven** e **Node.js** instalados.
+
+### 1. Subir a Infraestrutura
+```bash
+cd backend
+docker-compose up -d
 ```
 
-> **_NOTE:_**  Quarkus now ships with a Dev UI, which is available in dev mode only at <http://localhost:8080/q/dev/>.
-
-## Packaging and running the application
-
-The application can be packaged using:
-
-```shell script
-./mvnw package
+### 2. Iniciar a API Quarkus (Porta 8080)
+```bash
+cd backend
+./mvnw compile quarkus:dev
 ```
+A API expõe o Swagger UI em http://localhost:8080/q/swagger-ui/ para exploração dos endpoints REST.
 
-It produces the `quarkus-run.jar` file in the `target/quarkus-app/` directory.
-Be aware that it’s not an _über-jar_ as the dependencies are copied into the `target/quarkus-app/lib/` directory.
-
-The application is now runnable using `java -jar target/quarkus-app/quarkus-run.jar`.
-
-If you want to build an _über-jar_, execute the following command:
-
-```shell script
-./mvnw package -Dquarkus.package.jar.type=uber-jar
+### 3. Iniciar o Back-Office React (Porta 5173)
+```bash
+cd frontend
+npm install
+npm run dev
 ```
-
-The application, packaged as an _über-jar_, is now runnable using `java -jar target/*-runner.jar`.
-
-## Creating a native executable
-
-You can create a native executable using:
-
-```shell script
-./mvnw package -Dnative
-```
-
-Or, if you don't have GraalVM installed, you can run the native executable build in a container using:
-
-```shell script
-./mvnw package -Dnative -Dquarkus.native.container-build=true
-```
-
-You can then execute your native executable with: `./target/wallet-core-1.0.0-SNAPSHOT-runner`
-
-If you want to learn more about building native executables, please consult <https://quarkus.io/guides/maven-tooling>.
-
-## Related Guides
-
-- Messaging - RabbitMQ Connector ([guide](https://quarkus.io/guides/rabbitmq)): Connect to RabbitMQ with Reactive Messaging
-- REST Jackson ([guide](https://quarkus.io/guides/rest#json-serialisation)): Jackson serialization support for Quarkus REST. This extension is not compatible with the quarkus-resteasy extension, or any of the extensions that depend on it
-- Hibernate ORM with Panache ([guide](https://quarkus.io/guides/hibernate-orm-panache)): Simplified JPA/Hibernate data access layer with active record and repository patterns
-- Redis Client ([guide](https://quarkus.io/guides/redis)): Connect to Redis in either imperative or reactive style
-- JDBC Driver - PostgreSQL ([guide](https://quarkus.io/guides/datasource)): Connect to the PostgreSQL database via JDBC
-
-## Provided Code
-
-### Hibernate ORM
-
-Create your first JPA entity
-
-[Related guide section...](https://quarkus.io/guides/hibernate-orm)
-
-
-[Related Hibernate with Panache section...](https://quarkus.io/guides/hibernate-orm-panache)
-
-
-### REST
-
-Easily start your REST Web Services
-
-[Related guide section...](https://quarkus.io/guides/getting-started-reactive#reactive-jax-rs-resources)
