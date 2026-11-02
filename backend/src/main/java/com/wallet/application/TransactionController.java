@@ -9,6 +9,9 @@ import jakarta.ws.rs.*;
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
 
+import java.util.List;
+import java.util.UUID;
+
 @Path("/api/v1/transactions")
 @Produces(MediaType.APPLICATION_JSON)
 @Consumes(MediaType.APPLICATION_JSON)
@@ -37,5 +40,13 @@ public class TransactionController {
 
         // 4. Retornar 202 Accepted (Em processamento)
         return Response.status(202).entity(tx).build();
+    }
+
+    @GET
+    public Response getTransactions(@QueryParam("accountId") UUID accountId) {
+        // Buscar transações ordenadas da mais recente para a mais antiga usando Panache
+        List<Transaction> transactions = Transaction.find("accountId = ?1 order by createdAt desc", accountId).list();
+        
+        return Response.ok(transactions).build();
     }
 }

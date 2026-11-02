@@ -1,18 +1,33 @@
 import { useEffect, useState } from 'react';
 import { api } from './services/api';
 
+interface Transaction {
+  id: string;
+  amount: number;
+  type: 'CREDIT' | 'DEBIT';
+  status: string;
+  createdAt: string;
+}
+
 export default function App() {
   const [balance, setBalance] = useState<number | null>(null);
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [amount, setAmount] = useState('');
   const accountId = "c6808574-6c8b-46c0-9114-ba0bf7a88bf2"; 
 
-  const fetchBalance = () => {
-    api.get(`/accounts/${accountId}`)
-      .then(response => setBalance(response.data.balance))
-      .catch(error => console.error("Erro:", error));
+  const fetchData = async () => {
+    try {
+      const balanceRes = await api.get(`/accounts/${accountId}`);
+      setBalance(balanceRes.data.balance);
+      
+      const txRes = await api.get(`/transactions?accountId=${accountId}`);
+      setTransactions(txRes.data);
+    } catch (error) {
+      console.error("Erro ao buscar dados:", error);
+    }
   };
 
-  useEffect(() => { fetchBalance(); }, []);
+  useEffect(() => { fetchData(); }, []);
 
   const handleTransaction = async (type: 'CREDIT' | 'DEBIT') => {
     if (!amount || isNaN(Number(amount))) return;
@@ -21,10 +36,10 @@ export default function App() {
         accountId,
         amount: Number(amount),
         type,
-        idempotencyKey: crypto.randomUUID() // Gera chave única nativamente
+        idempotencyKey: crypto.randomUUID()
       });
       setAmount('');
-      setTimeout(fetchBalance, 500); // Dá tempo ao RabbitMQ para processar
+      setTimeout(fetchData, 500);
     } catch (error) {
       alert("Erro ao processar transação. Verifique o console.");
     }
@@ -57,6 +72,25 @@ export default function App() {
             <button onClick={() => handleTransaction('DEBIT')} className="w-full bg-red-600 hover:bg-red-700 text-white font-bold py-3 rounded-lg transition">
               Sacar
             </button>
+          </div>
+        </div>
+
+        <div className="mt-8 border-t border-gray-200 pt-6">
+          <h2 className="text-lg font-bold text-gray-800 mb-4">Histórico Recente</h2>
+          <div className="space-y-3 max-h-64 overflow-y-auto">
+            {transactions.length > 0 ? transactions.map(tx => (
+              <div key={tx.id} className="flex justify-between items-center p-3 bg-gray-50 rounded-lg border border-gray-100">
+                <div>
+                  <p className="text-sm font-semibold text-gray-700">{tx.type === 'CREDIT' ? 'Depósito' : 'Saque'}</p>
+                  <p className="text-xs text-gray-500">{new Date(tx.createdAt).toLocaleString('pt-BR')}</p>
+                </div>
+                <span className={`font-bold ${tx.type === 'CREDIT' ? 'text-green-600' : 'text-red-600'}`}>
+                  {tx.type === 'CREDIT' ? '+' : '-'} R$ {tx.amount.toFixed(2)}
+                </span>
+              </div>
+            )) : (
+              <p className="text-sm text-gray-500 text-center">Nenhuma transação encontrada.</p>
+            )}
           </div>
         </div>
       </div>
