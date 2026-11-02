@@ -1,5 +1,6 @@
 package com.wallet.application;
 
+import com.wallet.domain.Account;
 import com.wallet.domain.Transaction;
 import com.wallet.infrastructure.IdempotencyService;
 import com.wallet.infrastructure.TransactionProducer;
@@ -26,19 +27,31 @@ public class TransactionController {
     @POST
     @Transactional
     public Response createTransaction(TransactionRequestDTO dto) {
-        // 1. Barrar duplicidade em milissegundos via Redis
+        // 1. Validar se a conta existe e se está com status ativo
+        Account account = Account.findById(dto.accountId);
+        if (account == null) {
+            return Response.status(404).entity("Conta não encontrada.").build();
+        }
+
+        if (account.status != Account.AccountStatus.ACTIVE) {
+            return Response.status(Response.Status.FORBIDDEN)
+                           .entity("Operação negada. Conta com status: " + account.status)
+                           .build();
+        }
+
+        // 2. Barrar duplicidade em milissegundos via Redis
         if (idempotencyService.isDuplicate(dto.idempotencyKey)) {
             return Response.status(409).entity("Transação duplicada interceptada pelo Cache.").build();
         }
 
-        // 2. Salvar transação no banco relacional como PENDENTE
+        // 3. Salvar transação no banco relacional como PENDENTE
         Transaction tx = new Transaction(dto.accountId, dto.amount, dto.type, dto.idempotencyKey);
         tx.persist();
 
-        // 3. Enviar evento para processamento assíncrono
+        // 4. Enviar evento para processamento assíncrono
         producer.sendTransactionToQueue(tx.id);
 
-        // 4. Retornar 202 Accepted (Em processamento)
+        // 5. Retornar 202 Accepted (Em processamento)
         return Response.status(202).entity(tx).build();
     }
 
