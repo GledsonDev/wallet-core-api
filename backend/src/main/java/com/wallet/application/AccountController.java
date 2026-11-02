@@ -1,53 +1,67 @@
 package com.wallet.application;
 
 import com.wallet.domain.Account;
+import jakarta.annotation.security.RolesAllowed;
 import jakarta.inject.Inject;
-import jakarta.transaction.Transactional;
 import jakarta.ws.rs.*;
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
+import java.util.UUID;
+import org.eclipse.microprofile.jwt.JsonWebToken;
 import org.eclipse.microprofile.openapi.annotations.Operation;
-import org.eclipse.microprofile.openapi.annotations.responses.APIResponse;
-import org.eclipse.microprofile.openapi.annotations.responses.APIResponses;
+import org.eclipse.microprofile.openapi.annotations.enums.SecuritySchemeType;
+import org.eclipse.microprofile.openapi.annotations.security.SecurityRequirement;
+import org.eclipse.microprofile.openapi.annotations.security.SecurityScheme;
 import org.eclipse.microprofile.openapi.annotations.tags.Tag;
 
-import java.util.UUID;
-
+@SecurityScheme(
+    securitySchemeName = "jwt",
+    type = SecuritySchemeType.HTTP,
+    scheme = "bearer",
+    bearerFormat = "JWT"
+)
 @Path("/api/v1/accounts")
 @Produces(MediaType.APPLICATION_JSON)
 @Consumes(MediaType.APPLICATION_JSON)
-@Tag(name = "Accounts", description = "Gestão de Contas Bancárias")
+@Tag(name = "Accounts", description = "Gestão de Contas e Perfil")
 public class AccountController {
 
     @Inject
     AccountService accountService;
 
+    @Inject
+    JsonWebToken jwt;
+
     @POST
-    @Transactional
-    @Operation(summary = "Criar nova conta bancária", description = "Regista uma nova conta com CPF encriptado e senha com hash seguro.")
-    @APIResponses({
-        @APIResponse(responseCode = "201", description = "Conta criada com sucesso"),
-        @APIResponse(responseCode = "400", description = "Erro de validação ou CPF já existente")
-    })
-    public Response createAccount(AccountRequestDTO dto) {
+    @Path("/register")
+    @Operation(summary = "Criar nova conta", description = "Regista um novo utilizador no banco (endpoint público).")
+    public Response register(RegisterAccountDTO dto) {
         try {
-            Account newAccount = accountService.registerAccount(dto.ownerName, dto.documentCpf, dto.password);
-            return Response.status(201).entity(newAccount).build();
-        } catch (Exception e) {
-            return Response.status(400).entity("Erro ao criar conta: " + e.getMessage()).build();
+            Account account = accountService.registerAccount(dto.ownerName, dto.documentCpf, dto.rawPassword);
+            return Response.status(Response.Status.CREATED).entity(account).build();
+        } catch (IllegalArgumentException e) {
+            return Response.status(Response.Status.BAD_REQUEST).entity(e.getMessage()).build();
         }
     }
 
     @GET
-    @Path("/{id}")
-    @Operation(summary = "Buscar conta por ID", description = "Retorna os detalhes de uma conta bancária com base no UUID.")
-    @APIResponses({
-        @APIResponse(responseCode = "200", description = "Conta encontrada com sucesso"),
-        @APIResponse(responseCode = "404", description = "Conta não encontrada")
-    })
-    public Response getAccount(@PathParam("id") UUID id) {
-        return Account.findByIdOptional(id)
-                .map(acc -> Response.ok(acc).build())
-                .orElse(Response.status(404).build());
+    @Path("/me")
+    @SecurityRequirement(name = "jwt")
+    @RolesAllowed("USER")
+    @Operation(summary = "Dados do perfil", description = "Retorna os dados da conta autenticada, incluindo saldo.")
+    public Response getMyProfile() {
+        UUID authenticatedAccountId = UUID.fromString(jwt.getName());
+        Account account = accountService.findById(authenticatedAccountId);
+        return Response.ok(account).build();
+    }
+
+    @GET
+    @Path("/statement")
+    @SecurityRequirement(name = "jwt")
+    @RolesAllowed("USER")
+    @Operation(summary = "Extrato", description = "Retorna o histórico de transações da conta.")
+    public Response getStatement() {
+        UUID authenticatedAccountId = UUID.fromString(jwt.getName());
+        return Response.ok(accountService.getStatement(authenticatedAccountId)).build();
     }
 }
