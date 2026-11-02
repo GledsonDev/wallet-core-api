@@ -7,11 +7,20 @@ import java.util.UUID;
 
 @ApplicationScoped
 public class TokenService {
-    public String generateToken(UUID accountId) {
+    
+    public String generateAccessToken(UUID accountId) {
         return Jwt.issuer("wallet-core-api")
                   .upn(accountId.toString())
                   .groups(Set.of("USER"))
-                  .expiresIn(3600) // Token válido por 1 hora
+                  .expiresIn(900) // 15 minutos
+                  .sign();
+    }
+
+    public String generateRefreshToken(UUID accountId) {
+        return Jwt.issuer("wallet-core-api")
+                  .upn(accountId.toString())
+                  .claim("type", "refresh")
+                  .expiresIn(86400) // 24 horas
                   .sign();
     }
 }

@@ -1,8 +1,11 @@
 package com.wallet.application;
 
 import com.wallet.domain.Account;
+import com.wallet.domain.AuditLog;
+
 import jakarta.annotation.security.RolesAllowed;
 import jakarta.inject.Inject;
+import jakarta.transaction.Transactional;
 import jakarta.ws.rs.*;
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
@@ -63,5 +66,35 @@ public class AccountController {
     public Response getStatement() {
         UUID authenticatedAccountId = UUID.fromString(jwt.getName());
         return Response.ok(accountService.getStatement(authenticatedAccountId)).build();
+    }
+
+    @PATCH
+    @Path("/{id}/suspend")
+    @RolesAllowed("USER") // Temporariamente USER
+    @Transactional
+    public Response suspendAccount(@PathParam("id") UUID accountId) {
+        Account account = Account.findById(accountId);
+        if (account == null) return Response.status(Response.Status.NOT_FOUND).build();
+        
+        account.status = Account.AccountStatus.BLOCKED_SUSPICIOUS;
+        account.persist();
+        new AuditLog(accountId, "ACCOUNT_SUSPENDED", "Conta bloqueada por atividade suspeita").persist();
+        
+        return Response.ok(account).build();
+    }
+
+    @PATCH
+    @Path("/{id}/close")
+    @RolesAllowed("USER")
+    @Transactional
+    public Response closeAccount(@PathParam("id") UUID accountId) {
+        Account account = Account.findById(accountId);
+        if (account == null) return Response.status(Response.Status.NOT_FOUND).build();
+        
+        account.status = Account.AccountStatus.CLOSED;
+        account.persist();
+        new AuditLog(accountId, "ACCOUNT_CLOSED", "Encerramento de conta solicitado").persist();
+        
+        return Response.ok(account).build();
     }
 }

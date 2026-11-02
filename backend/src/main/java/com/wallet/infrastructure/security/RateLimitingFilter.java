@@ -2,7 +2,6 @@ package com.wallet.infrastructure.security;
 
 import io.github.bucket4j.Bandwidth;
 import io.github.bucket4j.Bucket;
-import io.github.bucket4j.Refill;
 import jakarta.ws.rs.container.ContainerRequestContext;
 import jakarta.ws.rs.container.ContainerRequestFilter;
 import jakarta.ws.rs.core.Response;
@@ -29,7 +28,10 @@ public class RateLimitingFilter implements ContainerRequestFilter {
 
     private Bucket createNewBucket(String key) {
         return Bucket.builder()
-            .addLimit(Bandwidth.classic(10, Refill.greedy(10, Duration.ofMinutes(1))))
+            .addLimit(Bandwidth.builder()
+                .capacity(10)
+                .refillGreedy(10, Duration.ofMinutes(1))
+                .build())
             .build();
     }
 }

@@ -1,6 +1,7 @@
 package com.wallet.application;
 
 import com.wallet.domain.Account;
+import com.wallet.domain.PixKey;
 import com.wallet.domain.Transaction;
 import com.wallet.infrastructure.security.CryptoUtils;
 
@@ -56,6 +57,24 @@ public class AccountService {
     }
 
     @Transactional
+    public PixKey registerPixKey(UUID accountId, String keyValue, PixKey.KeyType type) {
+        String encryptedKey = cryptoUtils.encrypt(keyValue);
+        
+        if (PixKey.find("keyValue", encryptedKey).firstResult() != null) {
+            throw new IllegalArgumentException("Esta chave Pix já está registada.");
+        }
+        
+        PixKey pixKey = new PixKey();
+        pixKey.accountId = accountId;
+        pixKey.keyValue = encryptedKey;
+        pixKey.keyType = type;
+        pixKey.persist();
+        
+        new com.wallet.domain.AuditLog(accountId, "PIX_KEY_REGISTERED", "Tipo: " + type).persist();
+        return pixKey;
+    }
+
+    @Transactional
     public Transaction executePixTransfer(UUID sourceAccountId, String destinationCpf, BigDecimal amount, String idempotencyKey) {
         if (amount == null || amount.compareTo(BigDecimal.ZERO) <= 0) {
             throw new IllegalArgumentException("O valor da transferência deve ser maior que zero.");
@@ -80,15 +99,17 @@ public class AccountService {
             throw new IllegalArgumentException("Saldo insuficiente para realizar a transferência.");
         }
 
-        // 4. Buscar conta de destino pelo CPF (CORREÇÃO: Encriptar antes de buscar)
-        String encryptedDestCpf = cryptoUtils.encrypt(destinationCpf);
-        Account destinationAccount = Account.find("documentCpf", encryptedDestCpf).firstResult();
-        if (destinationAccount == null || destinationAccount.status != Account.AccountStatus.ACTIVE) {
-            throw new IllegalArgumentException("Conta de destino não encontrada ou inativa.");
+        // 4. Buscar conta de destino pelo CPF
+        String encryptedPixKey = cryptoUtils.encrypt(destinationCpf); // destinationCpf agora atua como keyValue
+        PixKey pixKey = PixKey.find("keyValue", encryptedPixKey).firstResult();
+        
+        if (pixKey == null) {
+            throw new IllegalArgumentException("Chave Pix de destino não encontrada.");
         }
-
-        if (sourceAccount.id.equals(destinationAccount.id)) {
-            throw new IllegalArgumentException("Não é permitido efetuar uma transferência Pix para a mesma conta.");
+        
+        Account destinationAccount = Account.findById(pixKey.accountId);
+        if (destinationAccount == null || destinationAccount.status != Account.AccountStatus.ACTIVE) {
+            throw new IllegalArgumentException("Conta de destino inativa ou bloqueada.");
         }
 
         // 5. Executar a movimentação financeira

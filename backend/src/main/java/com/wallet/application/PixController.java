@@ -39,6 +39,20 @@ public class PixController {
     AccountService accountService;
 
     @POST
+    @Path("/keys")
+    @RolesAllowed("USER")
+    @Operation(summary = "Registar Chave Pix", description = "Associa uma nova chave Pix à conta autenticada.")
+    public Response registerKey(PixKeyRequestDTO dto) {
+        try {
+            UUID authenticatedAccountId = UUID.fromString(jwt.getName());
+            com.wallet.domain.PixKey pixKey = accountService.registerPixKey(authenticatedAccountId, dto.keyValue, dto.keyType);
+            return Response.status(Response.Status.CREATED).entity(pixKey).build();
+        } catch (IllegalArgumentException e) {
+            return Response.status(Response.Status.BAD_REQUEST).entity(e.getMessage()).build();
+        }
+    }
+
+    @POST
     @RolesAllowed("USER")
     @Operation(summary = "Realizar transferência Pix", description = "Efetua transferência atômica utilizando o CPF de destino.")
     @APIResponses({
