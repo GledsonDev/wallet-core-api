@@ -1,0 +1,25 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:15
+    container_name: wallet_postgres
+    environment:
+      POSTGRES_USER: wallet
+      POSTGRES_PASSWORD: wallet_pass
+      POSTGRES_DB: wallet_db
+    ports:
+      - "5432:5432"
+
+  redis:
+    image: redis:7
+    container_name: wallet_redis
+    ports:
+      - "6379:6379"
+
+  rabbitmq:
+    image: rabbitmq:3-management
+    container_name: wallet_rabbitmq
+    ports:
+      - "5672:5672"   # Porta padrão do mensageiro
+      - "15672:15672" # Painel visual de gestão
