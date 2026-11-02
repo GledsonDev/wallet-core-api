@@ -1,5 +1,6 @@
 package com.wallet.infrastructure;
 
+import com.wallet.domain.Account;
 import com.wallet.domain.Transaction;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.transaction.Transactional;
@@ -13,12 +14,29 @@ public class TransactionWorker {
     @Transactional
     public void processTransaction(String transactionId) {
         Transaction tx = Transaction.findById(UUID.fromString(transactionId));
-        
-        if (tx != null && "PENDING".equals(tx.status)) {
-            // Em um cenário completo, buscaríamos a Account para validar o saldo aqui
-            tx.status = "COMPLETED";
+        if (tx == null || !"PENDING".equals(tx.status)) return;
+
+        Account account = Account.findById(tx.accountId);
+        if (account == null) {
+            tx.status = "FAILED";
             tx.persist();
-            System.out.println("[WORKER] Transação processada e consolidada: " + transactionId);
+            return;
         }
+
+        if ("DEBIT".equals(tx.type)) {
+            if (account.balance.compareTo(tx.amount) < 0) {
+                tx.status = "FAILED"; // Saldo insuficiente
+            } else {
+                account.balance = account.balance.subtract(tx.amount);
+                tx.status = "COMPLETED";
+            }
+        } else if ("CREDIT".equals(tx.type)) {
+            account.balance = account.balance.add(tx.amount);
+            tx.status = "COMPLETED";
+        }
+        
+        account.persist();
+        tx.persist();
+        System.out.println("[WORKER] Transação processada. Novo saldo: " + account.balance);
     }
 }
